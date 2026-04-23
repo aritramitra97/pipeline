@@ -1,46 +1,36 @@
 pipeline {
     agent any
-
+ 
     environment {
-        S3_BUCKET = 's3://technova-jenkins-backup-aritra'
+        AWS_ACCESS_KEY_ID     = credentials('aws-s3-backup-creds')
+        AWS_SECRET_ACCESS_KEY = credentials('aws-s3-backup-creds')
+        S3_BUCKET             = 's3://technova-jenkins-backup-aritra'
     }
-
+ 
     stages {
-        stage('Archive & Compress') {
+        stage('Archive') {
             steps {
-                echo "Packaging files from workspace..."
-                sh 'tar -czf jenkins-project.tar.gz .'
+                sh '''
+                set -e
+                tar --exclude='.git' -czf backup-$(date +%F-%H-%M).tar.gz .
+                '''
             }
         }
-
-        stage('Upload to AWS S3') {
+ 
+        stage('Upload') {
             steps {
-                echo "Pushing artifact to AWS..."
-                withCredentials([usernamePassword(
-                    credentialsId: 'aws-s3-backup-creds',
-                    usernameVariable: 'AWS_ACCESS_KEY_ID',
-                    passwordVariable: 'AWS_SECRET_ACCESS_KEY'
-                )]) {
-                    sh '''
-                        export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-                        export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-                        aws s3 cp jenkins-project.tar.gz ${S3_BUCKET}/backups/
-                    '''
-                }
+                sh '''
+                set -e
+                aws s3 cp *.tar.gz ${S3_BUCKET}/backups2/
+                aws s3 ls ${S3_BUCKET}/backups2/
+                '''
             }
         }
     }
-
+ 
     post {
         always {
-            echo "Cleaning up workspace..."
             sh 'rm -f *.tar.gz'
-        }
-        success {
-            echo "Deployment to S3 successful!"
-        }
-        failure {
-            echo "Build failed. Check SCM URL or credentials."
         }
     }
 }
