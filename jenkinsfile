@@ -2,19 +2,13 @@ pipeline {
     agent any
 
     environment {
-        // Correct way to bind AWS credentials in a declarative pipeline
-        AWS_ACCESS_KEY_ID     = credentials('aws-s3-backup-creds')
-        AWS_SECRET_ACCESS_KEY = credentials('aws-s3-backup-creds')
-        S3_BUCKET             = 's3://technova-jenkins-backup-aritra'
+        S3_BUCKET = 's3://technova-jenkins-backup-aritra'
     }
 
     stages {
-        // We removed the manual 'Checkout' stage because Jenkins does it automatically
-        
         stage('Archive & Compress') {
             steps {
                 echo "Packaging files from workspace..."
-                // This archives the code Jenkins just pulled from Git
                 sh 'tar -czf jenkins-project.tar.gz .'
             }
         }
@@ -22,8 +16,17 @@ pipeline {
         stage('Upload to AWS S3') {
             steps {
                 echo "Pushing artifact to AWS..."
-                // AWS CLI automatically uses the AWS_ACCESS_KEY_ID env variables
-                sh "aws s3 cp jenkins-project.tar.gz ${S3_BUCKET}/backups/"
+                withCredentials([usernamePassword(
+                    credentialsId: 'aws-s3-backup-creds',
+                    usernameVariable: 'AWS_ACCESS_KEY_ID',
+                    passwordVariable: 'AWS_SECRET_ACCESS_KEY'
+                )]) {
+                    sh '''
+                        export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                        export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                        aws s3 cp jenkins-project.tar.gz ${S3_BUCKET}/backups/
+                    '''
+                }
             }
         }
     }
@@ -37,7 +40,7 @@ pipeline {
             echo "Deployment to S3 successful!"
         }
         failure {
-            echo "Build failed. Please check the 'hhttps' typo in your SCM settings or Jenkinsfile."
+            echo "Build failed. Check SCM URL or credentials."
         }
     }
 }
