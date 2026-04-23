@@ -22,7 +22,7 @@ pipeline {
                 sh '''
                 set -e
                 aws s3 cp *.tar.gz ${S3_BUCKET}/backups2/
-                aws s3 ls ${S3_BUCKET}/backups2/
+                aws s3 ls ${S3_BUCKET}/backups/
                 '''
             }
         }
